@@ -13,7 +13,7 @@
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <style>
   .article{max-width:1140px;margin:0 auto;padding:70px 24px 90px}
-  .article h1{font:400 clamp(40px,5.4vw,64px)/1.15 "Raleway",sans-serif;color:var(--ink);margin:0 0 22px}
+  .article h1{font:400 clamp(40px,5.4vw,64px)/1.15 "Raleway",sans-serif;color:var(--ink);margin:0 0 36px}
   .updated{color:var(--muted);font-size:17px;margin:0 0 34px}
   .dash{border:1px solid var(--line);box-shadow:0 2px 14px rgba(0,0,0,.08);background:#fff}
   .dash-bar{display:flex;flex-wrap:wrap;gap:14px 24px;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--line);background:#faf8fe}
@@ -59,7 +59,6 @@
 
 <main class="article">
   <h1>Why Do Patients Miss Clinic Appointments?</h1>
-  <p class="updated">Last updated on <span id="updated">Nov 19, 2026</span></p>
 
   <section class="dash" aria-label="Interactive dashboard">
     <div class="dash-bar">
@@ -254,8 +253,6 @@ function draw() {
 function setup(data) {
   D = data;
   D.wait_labels = D.wait_groups.map(w => w.startsWith("0 days") ? "Same day" : w);
-  document.getElementById("updated").textContent =
-    new Date(D.updated + "T12:00:00").toLocaleDateString("en-US", {month: "short", day: "numeric", year: "numeric"});
 
   const select = document.getElementById("nb");
   D.neighbourhoods.forEach((name, i) => select.add(new Option(name, i)));

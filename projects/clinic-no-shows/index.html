@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clinic Appointment No-Shows | Nancy Bogati Collum</title>
+<meta name="theme-color" content="#712bd6">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu&family=Lora:ital@1&family=Raleway:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="../../style.css">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  .article{max-width:1140px;margin:0 auto;padding:70px 24px 90px}
+  .article h1{font:400 clamp(40px,5.4vw,64px)/1.15 "Raleway",sans-serif;color:var(--ink);margin:0 0 22px}
+  .updated{color:var(--muted);font-size:17px;margin:0 0 34px}
+  .dash{border:1px solid var(--line);box-shadow:0 2px 14px rgba(0,0,0,.08);background:#fff}
+  .dash-bar{display:flex;flex-wrap:wrap;gap:14px 24px;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--line);background:#faf8fe}
+  .dash-bar label{font-weight:600;color:var(--ink);font-size:15px;margin-right:8px}
+  .dash-bar select{font:inherit;font-size:15px;padding:6px 10px;border:1px solid #cfc6e4;border-radius:4px;background:#fff;min-width:230px}
+  .pills{display:flex;flex-wrap:wrap;gap:6px}
+  .pills button{font:600 14px "Raleway",sans-serif;border:1px solid var(--purple);background:#fff;color:var(--purple);padding:6px 12px;border-radius:4px;cursor:pointer}
+  .pills button[aria-pressed="true"]{background:var(--purple);color:#fff}
+  .reset{font:600 14px "Raleway",sans-serif;background:none;border:0;color:var(--muted);cursor:pointer;text-decoration:underline}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--line)}
+  .kpi{padding:20px 24px;border-right:1px solid var(--line)}
+  .kpi:last-child{border-right:0}
+  .kpi .v{font:600 32px/1.1 "Raleway",sans-serif;color:var(--ink)}
+  .kpi .l{color:var(--muted);font-size:14px;margin-top:4px}
+  .kpi .v.accent{color:var(--purple)}
+  .charts{display:grid;grid-template-columns:1fr 1fr}
+  .chart{padding:18px 16px 8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0}
+  .chart:nth-child(2n){border-right:0}
+  .chart h2{font:600 17px "Raleway",sans-serif;color:var(--ink);margin:0 8px 2px}
+  .chart p{font-size:14px;color:var(--muted);margin:0 8px 4px;line-height:1.5}
+  .chart .plot{height:330px}
+  .chart.wide{grid-column:1 / -1;border-right:0}
+  .chart.wide .plot{height:380px}
+  .note{font-size:13px;color:var(--muted);padding:12px 24px}
+  .body{max-width:820px;font-size:20px;line-height:1.8;color:var(--ink);margin-top:44px}
+  .body h2{font:400 32px "Raleway",sans-serif;margin:46px 0 14px}
+  .body ul{padding-left:24px}.body li{margin-bottom:10px}
+  .stack{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0}
+  .stack li{background:#f1ecfb;color:var(--purple);border-radius:999px;padding:4px 14px;font-size:16px;margin:0}
+  @media (max-width:860px){.kpis{grid-template-columns:1fr 1fr}.kpi:nth-child(2){border-right:0}.charts{grid-template-columns:1fr}.chart{border-right:0}.body{font-size:18px}}
+</style>
+</head>
+<body>
+<header class="navbar"><div class="navbar-inner">
+  <a class="brand" href="../../index.html">Nancy Collum</a>
+  <nav class="nav" aria-label="Main">
+    <a href="../../index.html">about</a>
+    <a href="../../projects.html" class="active">projects</a>
+    <a href="../../assets/Nancy_Collum_Resume.pdf" target="_blank" rel="noopener">resume</a>
+    <a href="../../contact.html">contact</a>
+  </nav>
+</div></header>
+
+<main class="article">
+  <h1>Why Do Patients Miss Clinic Appointments?</h1>
+  <p class="updated">Last updated on <span id="updated">Nov 19, 2026</span></p>
+
+  <section class="dash" aria-label="Interactive dashboard">
+    <div class="dash-bar">
+      <div>
+        <label for="nb">Neighbourhood</label>
+        <select id="nb"><option value="-1">All neighbourhoods</option></select>
+      </div>
+      <div>
+        <label>Age group</label>
+        <div class="pills" id="ages" role="group" aria-label="Age group"></div>
+      </div>
+      <button type="button" class="reset" id="reset">Reset filters</button>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="v" id="k-appts">0</div><div class="l">Appointments</div></div>
+      <div class="kpi"><div class="v" id="k-ns">0</div><div class="l">No-shows</div></div>
+      <div class="kpi"><div class="v accent" id="k-rate">0%</div><div class="l">No-show rate</div></div>
+      <div class="kpi"><div class="v" id="k-gap">0x</div><div class="l">Booked 31+ days ahead vs same day</div></div>
+    </div>
+
+    <div class="charts">
+      <div class="chart">
+        <h2>The longer the wait, the more patients miss</h2>
+        <p>No-show rate by days between booking and appointment</p>
+        <div class="plot" id="c-wait"></div>
+      </div>
+      <div class="chart">
+        <h2>SMS reminders help, when compared fairly</h2>
+        <p>No-show rate with and without an SMS, within the same wait time</p>
+        <div class="plot" id="c-sms"></div>
+      </div>
+      <div class="chart wide">
+        <h2>Which neighbourhoods account for most no-shows</h2>
+        <p>Top 20 neighbourhoods by number of no-shows, with the cumulative share. Click a bar to filter the dashboard.</p>
+        <div class="plot" id="c-pareto"></div>
+      </div>
+      <div class="chart">
+        <h2>No-show rate by age group</h2>
+        <p>Click a bar to filter by that age group</p>
+        <div class="plot" id="c-age"></div>
+      </div>
+      <div class="chart">
+        <h2>No-show rate by weekday</h2>
+        <p>Saturday has very few appointments, so its rate is not reliable</p>
+        <div class="plot" id="c-day"></div>
+      </div>
+    </div>
+    <p class="note" id="note"></p>
+  </section>
+
+  <div class="body">
+    <p>This dashboard explores about 110,000 public clinic appointments from Vitória, Brazil, to find out which factors make patients more likely to miss an appointment. I designed a SQL Server database for the data, loaded it with a Python pipeline that checks data quality, and wrote the analysis as T-SQL views and a stored procedure. The charts above read from those views.</p>
+
+    <h2>Key findings</h2>
+    <ul>
+      <li><b>Wait time is the biggest factor.</b> About 5% of same-day appointments are missed, compared with 33% of appointments booked more than a month ahead.</li>
+      <li><b>SMS reminders lower no-shows by about 6 to 7 percentage points</b> for appointments booked 8 or more days ahead. Comparing all reminders at once hides this, because reminders were mostly sent for long waits, which already have more no-shows.</li>
+      <li><b>A few neighbourhoods drive most no-shows by volume,</b> but some busy neighbourhoods have below-average rates, so count and rate tell different stories.</li>
+      <li><b>The day of the week barely matters,</b> with rates staying between about 19% and 21% from Monday to Friday.</li>
+    </ul>
+
+    <h2>How I built it</h2>
+    <ul>
+      <li>Designed a normalized database (patients, neighbourhoods, appointments) with primary and foreign keys, CHECK constraints, and a computed wait-time column.</li>
+      <li>Built a Python loader with Pandas and SQLAlchemy that validates every row. Rows that break a rule, such as a negative age or an appointment dated before its booking, are saved to a rejects table with the reason instead of being silently dropped.</li>
+      <li>Wrote T-SQL views for each analysis, including a Pareto view using window functions, and a stored procedure that summarizes any date range or neighbourhood.</li>
+    </ul>
+    <ul class="stack">
+      <li>SQL Server</li><li>T-SQL</li><li>Python</li><li>Pandas</li><li>SQLAlchemy</li><li>Docker</li><li>Plotly</li>
+    </ul>
+    <p><a href="https://github.com/ncollum/clinic-no-show-analysis" target="_blank" rel="noopener">View the code on GitHub</a>. Data: Medical Appointment No Shows (Kaggle).</p>
+  </div>
+</main>
+<footer>© 2026 Nancy Bogati Collum</footer>
+
+<script>
+const PURPLE = "#712bd6", ORANGE = "#f2a541", GREY = "#cfc6e4", INK = "#2b2b2b";
+const FONT = {family: "Raleway, Arial, sans-serif", size: 13, color: INK};
+const CONFIG = {displayModeBar: false, responsive: true};
+const state = {nb: -1, age: -1};
+let D;
+
+const pct = (ns, n) => n ? 100 * ns / n : null;
+const fmt = n => n.toLocaleString("en-US");
+
+function layout(extra) {
+  return Object.assign({
+    font: FONT, margin: {l: 52, r: 16, t: 14, b: 64}, paper_bgcolor: "#fff", plot_bgcolor: "#fff",
+    yaxis: {ticksuffix: "%", gridcolor: "#eee", rangemode: "tozero", fixedrange: true},
+    xaxis: {fixedrange: true}, bargap: 0.25, showlegend: false,
+    hoverlabel: {font: {family: "Raleway, Arial, sans-serif"}}
+  }, extra);
+}
+
+// Sum appointments and no-shows over the rows that match the filters, grouped by one column
+function group(rows, key, size) {
+  const n = new Array(size).fill(0), ns = new Array(size).fill(0);
+  for (const r of rows) { n[r[key]] += r[5]; ns[r[key]] += r[6]; }
+  return {n, ns, rate: n.map((v, i) => pct(ns[i], v))};
+}
+
+function filtered({ignoreNb = false, ignoreAge = false} = {}) {
+  return D.rows.filter(r =>
+    (ignoreNb || state.nb < 0 || r[0] === state.nb) &&
+    (ignoreAge || state.age < 0 || r[1] === state.age));
+}
+
+function draw() {
+  const rows = filtered();
+  const n = rows.reduce((a, r) => a + r[5], 0), ns = rows.reduce((a, r) => a + r[6], 0);
+  document.getElementById("k-appts").textContent = fmt(n);
+  document.getElementById("k-ns").textContent = fmt(ns);
+  document.getElementById("k-rate").textContent = n ? pct(ns, n).toFixed(1) + "%" : "n/a";
+
+  const wait = group(rows, 2, D.wait_groups.length);
+  const last = wait.rate[wait.rate.length - 1], first = wait.rate[0];
+  document.getElementById("k-gap").textContent = first && last ? (last / first).toFixed(1) + "x" : "n/a";
+
+  const hover = "<b>%{x}</b><br>No-show rate: %{y:.1f}%<br>%{customdata[1]:,} of %{customdata[0]:,} appointments<extra></extra>";
+
+  Plotly.react("c-wait", [{
+    type: "bar", x: D.wait_labels, y: wait.rate, marker: {color: PURPLE},
+    customdata: wait.n.map((v, i) => [v, wait.ns[i]]), hovertemplate: hover,
+    text: wait.rate.map(v => v == null ? "" : v.toFixed(1) + "%"), textposition: "outside", cliponaxis: false
+  }], layout({xaxis: {fixedrange: true, tickangle: 0, title: {text: "Days between booking and appointment"}}}), CONFIG);
+
+  // SMS comparison: skip same-day, since same-day appointments never got an SMS
+  const smsTraces = [0, 1].map(s => {
+    const g = group(rows.filter(r => r[3] === s && r[2] > 0), 2, D.wait_groups.length);
+    return {
+      type: "bar", name: s ? "SMS reminder" : "No SMS", x: D.wait_labels.slice(1), y: g.rate.slice(1),
+      marker: {color: s ? PURPLE : GREY}, customdata: g.n.slice(1).map((v, i) => [v, g.ns[i + 1]]),
+      hovertemplate: "<b>%{x}</b>, " + (s ? "SMS reminder" : "no SMS") + "<br>No-show rate: %{y:.1f}%<br>%{customdata[1]:,} of %{customdata[0]:,} appointments<extra></extra>"
+    };
+  });
+  Plotly.react("c-sms", smsTraces, layout({
+    barmode: "group", showlegend: true, legend: {orientation: "h", x: 0, y: 1.12},
+    margin: {l: 52, r: 16, t: 30, b: 64}, xaxis: {fixedrange: true, tickangle: 0, title: {text: "Days between booking and appointment"}}
+  }), CONFIG);
+
+  // Pareto: ignore the neighbourhood filter so the chart shows all neighbourhoods
+  const byNb = group(filtered({ignoreNb: true}), 0, D.neighbourhoods.length);
+  const order = byNb.ns.map((v, i) => i).sort((a, b) => byNb.ns[b] - byNb.ns[a]);
+  const total = byNb.ns.reduce((a, b) => a + b, 0);
+  let running = 0;
+  const cumulative = order.map(i => (running += byNb.ns[i], 100 * running / total));
+  const top = order.slice(0, 20);
+  Plotly.react("c-pareto", [{
+    type: "bar", x: top.map(i => D.neighbourhoods[i]), y: top.map(i => byNb.ns[i]),
+    marker: {color: top.map(i => state.nb < 0 || i === state.nb ? PURPLE : GREY)},
+    customdata: top.map(i => [i, byNb.n[i], byNb.rate[i]]),
+    hovertemplate: "<b>%{x}</b><br>%{y:,} no-shows<br>No-show rate: %{customdata[2]:.1f}%<br>%{customdata[1]:,} appointments<extra></extra>"
+  }, {
+    type: "scatter", mode: "lines+markers", x: top.map(i => D.neighbourhoods[i]), y: cumulative.slice(0, 20),
+    yaxis: "y2", line: {color: ORANGE, width: 3}, marker: {size: 6},
+    hovertemplate: "Top neighbourhoods up to here: %{y:.1f}% of all no-shows<extra></extra>"
+  }], layout({
+    margin: {l: 60, r: 60, t: 14, b: 130},
+    yaxis: {title: {text: "No-shows"}, gridcolor: "#eee", fixedrange: true},
+    yaxis2: {overlaying: "y", side: "right", range: [0, 105], tickvals: [0, 20, 40, 60, 80, 100], ticksuffix: "%", showgrid: false, fixedrange: true, title: {text: "Cumulative share"}},
+    xaxis: {tickangle: -40, fixedrange: true}
+  }), CONFIG);
+
+  const age = group(filtered({ignoreAge: true}), 1, D.age_groups.length);
+  Plotly.react("c-age", [{
+    type: "bar", x: D.age_groups, y: age.rate,
+    marker: {color: D.age_groups.map((a, i) => state.age < 0 || i === state.age ? PURPLE : GREY)},
+    customdata: age.n.map((v, i) => [v, age.ns[i]]), hovertemplate: hover,
+    text: age.rate.map(v => v == null ? "" : v.toFixed(1) + "%"), textposition: "outside", cliponaxis: false
+  }], layout({xaxis: {fixedrange: true, title: {text: "Age"}}}), CONFIG);
+
+  const day = group(rows, 4, D.weekdays.length);
+  Plotly.react("c-day", [{
+    type: "bar", x: D.weekdays, y: day.rate,
+    marker: {color: D.weekdays.map(d => d === "Saturday" ? GREY : PURPLE)},
+    customdata: day.n.map((v, i) => [v, day.ns[i]]), hovertemplate: hover,
+    text: day.rate.map(v => v == null ? "" : v.toFixed(1) + "%"), textposition: "outside", cliponaxis: false
+  }], layout({}), CONFIG);
+
+  const where = state.nb < 0 ? "all neighbourhoods" : D.neighbourhoods[state.nb];
+  const who = state.age < 0 ? "all ages" : "ages " + D.age_groups[state.age];
+  document.getElementById("note").textContent =
+    `Showing ${where}, ${who}. Appointments from ${D.first_day} to ${D.last_day}. ` +
+    `${D.rejected_rows} rows failed data quality checks and are excluded.`;
+
+  document.getElementById("nb").value = state.nb;
+  document.querySelectorAll("#ages button").forEach(b =>
+    b.setAttribute("aria-pressed", String(Number(b.dataset.age) === state.age)));
+}
+
+function setup(data) {
+  D = data;
+  D.wait_labels = D.wait_groups.map(w => w.startsWith("0 days") ? "Same day" : w);
+  document.getElementById("updated").textContent =
+    new Date(D.updated + "T12:00:00").toLocaleDateString("en-US", {month: "short", day: "numeric", year: "numeric"});
+
+  const select = document.getElementById("nb");
+  D.neighbourhoods.forEach((name, i) => select.add(new Option(name, i)));
+  select.addEventListener("change", () => { state.nb = Number(select.value); draw(); });
+
+  const pills = document.getElementById("ages");
+  ["All", ...D.age_groups].forEach((label, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = label; b.dataset.age = i - 1;
+    b.addEventListener("click", () => { state.age = i - 1; draw(); });
+    pills.appendChild(b);
+  });
+  document.getElementById("reset").addEventListener("click", () => { state.nb = -1; state.age = -1; draw(); });
+
+  draw();
+
+  document.getElementById("c-pareto").on("plotly_click", e => {
+    const i = e.points[0].customdata && e.points[0].customdata[0];
+    if (typeof i === "number") { state.nb = state.nb === i ? -1 : i; draw(); }
+  });
+  document.getElementById("c-age").on("plotly_click", e => {
+    const i = e.points[0].pointIndex; state.age = state.age === i ? -1 : i; draw();
+  });
+}
+
+fetch("data.json").then(r => r.json()).then(setup).catch(() => {
+  document.getElementById("note").textContent = "The dashboard data could not be loaded.";
+});
+</script>
+</body>
+</html>

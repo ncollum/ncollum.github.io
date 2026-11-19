@@ -3,18 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Clinic Appointment No-Shows | Nancy Bogati Collum</title>
+<title>Why Do Patients Miss Clinic Appointments? | Nancy Bogati Collum</title>
+<meta name="description" content="Why Do Patients Miss Clinic Appointments?, a project by Nancy Bogati Collum.">
 <meta name="theme-color" content="#712bd6">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Gaegu&family=Lora:ital@1&family=Raleway:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Gaegu&family=Lora:ital@1&family=Raleway:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="../../style.css">
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <style>
-  .article{max-width:1140px;margin:0 auto;padding:70px 24px 90px}
-  .article h1{font:400 clamp(40px,5.4vw,64px)/1.15 "Raleway",sans-serif;color:var(--ink);margin:0 0 36px}
-  .updated{color:var(--muted);font-size:17px;margin:0 0 34px}
   .dash{border:1px solid var(--line);box-shadow:0 2px 14px rgba(0,0,0,.08);background:#fff}
   .dash-bar{display:flex;flex-wrap:wrap;gap:14px 24px;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--line);background:#faf8fe}
   .dash-bar label{font-weight:600;color:var(--ink);font-size:15px;margin-right:8px}
@@ -38,29 +36,25 @@
   .chart.wide{grid-column:1 / -1;border-right:0}
   .chart.wide .plot{height:380px}
   .note{font-size:13px;color:var(--muted);padding:12px 24px}
-  .body{max-width:820px;font-size:20px;line-height:1.8;color:var(--ink);margin-top:44px}
-  .body h2{font:400 32px "Raleway",sans-serif;margin:46px 0 14px}
-  .body ul{padding-left:24px}.body li{margin-bottom:10px}
-  .stack{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0}
-  .stack li{background:#f1ecfb;color:var(--purple);border-radius:999px;padding:4px 14px;font-size:16px;margin:0}
   @media (max-width:860px){.kpis{grid-template-columns:1fr 1fr}.kpi:nth-child(2){border-right:0}.charts{grid-template-columns:1fr}.chart{border-right:0}.body{font-size:18px}}
-</style>
+.post .dash{margin:30px 0 40px}.post .chart h2{font:600 17px "Raleway",sans-serif;margin:0 8px 2px}.post .chart p{font-size:14px;line-height:1.5;margin:0 8px 4px}.post .kpi .v{font-size:28px}@media (min-width:1000px){.post .dash{margin-left:-110px;margin-right:-110px}}</style>
 </head>
 <body>
 <header class="navbar"><div class="navbar-inner">
   <a class="brand" href="../../index.html">Nancy Collum</a>
   <nav class="nav" aria-label="Main">
     <a href="../../index.html">about</a>
-    <a href="../../projects.html" class="active">projects</a>
+    <a href="../../projects.html" class="active" aria-current="page">projects</a>
     <a href="../../assets/Nancy_Collum_Resume.pdf" target="_blank" rel="noopener">resume</a>
     <a href="../../contact.html">contact</a>
   </nav>
 </div></header>
+<main class="post">
+<h1>Why Do Patients Miss Clinic Appointments?</h1>
+<p class="meta"><i class="fas fa-folder"></i>personal project, database design, data quality, T-SQL, data visualization</p>
 
-<main class="article">
-  <h1>Why Do Patients Miss Clinic Appointments?</h1>
-
-  <section class="dash" aria-label="Interactive dashboard">
+<p>Every missed clinic appointment is a slot another patient could have used. Using about 110,000 public appointment records from Vitória, Brazil, I built a SQL Server database and analysis to find out which factors make a patient more likely to miss an appointment, and what a clinic could do about it. Explore the interactive dashboard below: filter by neighbourhood or age group, or click a bar.</p>
+<section class="dash" aria-label="Interactive dashboard">
     <div class="dash-bar">
       <div>
         <label for="nb">Neighbourhood</label>
@@ -109,32 +103,84 @@
     </div>
     <p class="note" id="note"></p>
   </section>
+<p class="question">The question: what makes a patient more likely to miss a booked appointment, and do SMS reminders actually help? I expected long waits between booking and the visit to matter, but I wanted to check whether reminders still made a difference once wait time was taken into account.</p>
 
-  <div class="body">
-    <p>This dashboard explores about 110,000 public clinic appointments from Vitória, Brazil, to find out which factors make patients more likely to miss an appointment. I designed a SQL Server database for the data, loaded it with a Python pipeline that checks data quality, and wrote the analysis as T-SQL views and a stored procedure. The charts above read from those views.</p>
+<h2>Methods</h2>
+<h3>The data</h3>
+<p>The data is the public Medical Appointment No Shows dataset (Kaggle), with 110,527 appointments booked between late April and early June 2016. Each row has the patient, the booking and appointment dates, the patient's age and neighbourhood, health flags, whether an SMS reminder was sent, and whether the patient showed up.</p>
+<h3>Designing the database</h3>
+<p>The raw file is one flat table where every neighbourhood name and patient repeats thousands of times. I normalized it into three tables, <code>patients</code>, <code>neighbourhoods</code> and <code>appointments</code>, linked by primary and foreign keys. CHECK constraints stop impossible values from getting in, and SQL Server calculates the wait time itself as a persisted computed column:</p>
+<pre><code><span class="k">CREATE</span> <span class="k">TABLE</span> dbo.appointments (
+    appointment_id     <span class="k">INT</span> <span class="k">NOT NULL</span> <span class="k">CONSTRAINT</span> pk_appointments <span class="k">PRIMARY KEY</span>,
+    patient_id         <span class="k">BIGINT</span> <span class="k">NOT NULL</span> <span class="k">CONSTRAINT</span> fk_appt_patient <span class="k">REFERENCES</span> dbo.patients (patient_id),
+    neighbourhood_id   <span class="k">INT</span> <span class="k">NOT NULL</span> <span class="k">CONSTRAINT</span> fk_appt_neighbourhood <span class="k">REFERENCES</span> dbo.neighbourhoods (neighbourhood_id),
+    scheduled_at       <span class="k">DATETIME2</span>(<span class="n">0</span>) <span class="k">NOT NULL</span>,
+    appointment_date   <span class="k">DATE</span> <span class="k">NOT NULL</span>,
+    age_at_appointment <span class="k">TINYINT</span> <span class="k">NOT NULL</span> <span class="k">CONSTRAINT</span> ck_appt_age <span class="k">CHECK</span> (age_at_appointment <span class="k">BETWEEN</span> <span class="n">0</span> <span class="k">AND</span> <span class="n">120</span>),
+    sms_received       <span class="k">BIT</span> <span class="k">NOT NULL</span>,
+    no_show            <span class="k">BIT</span> <span class="k">NOT NULL</span>,
+    <span class="c">-- days between booking and visit, calculated and stored by SQL Server</span>
+    wait_days <span class="k">AS</span> <span class="k">DATEDIFF</span>(DAY, <span class="k">CAST</span>(scheduled_at <span class="k">AS</span> <span class="k">DATE</span>), appointment_date) <span class="k">PERSISTED</span>,
+    <span class="k">CONSTRAINT</span> ck_appt_dates <span class="k">CHECK</span> (appointment_date &gt;= <span class="k">CAST</span>(scheduled_at <span class="k">AS</span> <span class="k">DATE</span>))
+);</code></pre>
+<p>Health flags such as hypertension are stored on each appointment, not on the patient, because they record what was true at that visit and can change over time.</p>
+<h3>Loading the data and checking its quality</h3>
+<p>A Python loader (Pandas and SQLAlchemy) reads the CSV, fixes misspelled column names from the source, converts the dates, and checks every row against a set of rules. Rows that break a rule are not silently dropped. They are saved to a <code>load_rejects</code> table with the reason, so the decision can be reviewed later. The whole load runs in one transaction, so a failure never leaves the database half loaded.</p>
+<pre><code><span class="c"># Each rule: (reason saved in load_rejects, rows that break it)</span>
+rules = [
+    (<span class="s">&quot;PatientId is not a whole number&quot;</span>, df[<span class="s">&quot;patient_id&quot;</span>].isna()),
+    (<span class="s">&quot;Age outside 0 to 120&quot;</span>, ~df[<span class="s">&quot;age_at_appointment&quot;</span>].between(<span class="n">0</span>, <span class="n">120</span>)),
+    (<span class="s">&quot;Appointment date is before the booking date&quot;</span>,
+     df[<span class="s">&quot;appointment_date&quot;</span>] &lt; df[<span class="s">&quot;scheduled_at&quot;</span>].dt.normalize()),
+    (<span class="s">&quot;Handicap level outside 0 to 4&quot;</span>, ~df[<span class="s">&quot;handicap_level&quot;</span>].between(<span class="n">0</span>, <span class="n">4</span>)),
+    (<span class="s">&quot;Gender is not F or M&quot;</span>, ~df[<span class="s">&quot;gender&quot;</span>].isin([<span class="s">&quot;F&quot;</span>, <span class="s">&quot;M&quot;</span>])),
+    (<span class="s">&quot;Duplicate AppointmentID&quot;</span>, df[<span class="s">&quot;appointment_id&quot;</span>].duplicated(keep=<span class="s">&quot;first&quot;</span>)),
+]</code></pre>
+<table><caption>Table 1: Rows that failed the data quality checks</caption><thead><tr><th>Reason</th><th>Rows</th></tr></thead><tbody><tr><td>PatientId is not a whole number</td><td>5</td></tr><tr><td>Appointment date is before the booking date</td><td>5</td></tr><tr><td>Age outside 0 to 120</td><td>1</td></tr><tr><td><b>Total rejected</b></td><td><b>11</b></td></tr></tbody></table><p class="table-note">110,516 of 110,527 rows (99.99%) passed every check.</p>
+<h3>Analysis in T-SQL</h3>
+<p>All of the analysis lives in the database as T-SQL views, so any report or dashboard reads the same numbers. One view joins the tables and adds readable groups (wait time, age group, weekday). The others calculate the no-show rate by each factor. To see which neighbourhoods drive the problem, I wrote a Pareto view using window functions:</p>
+<pre><code><span class="c">-- Pareto: which neighbourhoods account for most of the no-shows</span>
+<span class="k">CREATE</span> <span class="k">OR</span> ALTER <span class="k">VIEW</span> dbo.vw_no_show_pareto_by_neighbourhood <span class="k">AS</span>
+<span class="k">WITH</span> totals <span class="k">AS</span> (
+    <span class="k">SELECT</span> neighbourhood_name,
+           <span class="k">COUNT</span>(*) <span class="k">AS</span> appointments,
+           <span class="k">SUM</span>(<span class="k">CAST</span>(no_show <span class="k">AS</span> <span class="k">INT</span>)) <span class="k">AS</span> no_shows
+    <span class="k">FROM</span> dbo.vw_appointment_details
+    <span class="k">GROUP BY</span> neighbourhood_name
+)
+<span class="k">SELECT</span> neighbourhood_name, appointments, no_shows,
+       <span class="k">CAST</span>(<span class="n">100.0</span> * no_shows / <span class="k">SUM</span>(no_shows) <span class="k">OVER</span> () <span class="k">AS</span> <span class="k">DECIMAL</span>(<span class="n">5</span>,<span class="n">2</span>)) <span class="k">AS</span> share_of_no_shows_pct,
+       <span class="k">CAST</span>(<span class="n">100.0</span> * <span class="k">SUM</span>(no_shows) <span class="k">OVER</span> (<span class="k">ORDER BY</span> no_shows <span class="k">DESC</span>, neighbourhood_name <span class="k">ROWS UNBOUNDED PRECEDING</span>)
+            / <span class="k">SUM</span>(no_shows) <span class="k">OVER</span> () <span class="k">AS</span> <span class="k">DECIMAL</span>(<span class="n">5</span>,<span class="n">2</span>)) <span class="k">AS</span> cumulative_share_pct
+<span class="k">FROM</span> totals;</code></pre>
+<p>A stored procedure, <code>usp_no_show_summary</code>, returns the same summary for any date range or neighbourhood, which is the kind of tool a clinic manager could run every week.</p>
 
-    <h2>Key findings</h2>
-    <ul>
-      <li><b>Wait time is the biggest factor.</b> About 5% of same-day appointments are missed, compared with 33% of appointments booked more than a month ahead.</li>
-      <li><b>SMS reminders lower no-shows by about 6 to 7 percentage points</b> for appointments booked 8 or more days ahead. Comparing all reminders at once hides this, because reminders were mostly sent for long waits, which already have more no-shows.</li>
-      <li><b>A few neighbourhoods drive most no-shows by volume,</b> but some busy neighbourhoods have below-average rates, so count and rate tell different stories.</li>
-      <li><b>The day of the week barely matters,</b> with rates staying between about 19% and 21% from Monday to Friday.</li>
-    </ul>
+<h2>Results</h2>
+<h3>Wait time is the biggest factor</h3>
+<table><caption>Table 2: No-show rate by days between booking and appointment</caption><thead><tr><th>Wait time</th><th>Appointments</th><th>No-shows</th><th>No-show rate</th></tr></thead><tbody><tr><td>Same day</td><td>38,560</td><td>1,792</td><td>4.65%</td></tr><tr><td>1 to 3 days</td><td>14,673</td><td>3,359</td><td>22.89%</td></tr><tr><td>4 to 7 days</td><td>17,509</td><td>4,413</td><td>25.20%</td></tr><tr><td>8 to 14 days</td><td>12,025</td><td>3,664</td><td>30.47%</td></tr><tr><td>15 to 30 days</td><td>17,371</td><td>5,661</td><td>32.59%</td></tr><tr><td>31+ days</td><td>10,378</td><td>3,425</td><td>33.00%</td></tr><tr><td><b>All</b></td><td><b>110,516</b></td><td><b>22,314</b></td><td><b>20.19%</b></td></tr></tbody></table>
+<p>Patients booked for the same day almost always come (95%). Once the wait is more than a month, one in three appointments is missed, about <b>7 times the same-day rate</b>.</p>
+<h3>SMS reminders help, but only a fair comparison shows it</h3>
+<p>Reminders were mostly sent for appointments booked far ahead, which already have high no-show rates. If you compare everyone who got an SMS with everyone who did not, reminders look like they make things worse. Comparing within the same wait time tells the real story:</p>
+<table><caption>Table 3: No-show rate with and without an SMS reminder, within the same wait time</caption><thead><tr><th>Wait time</th><th>No SMS</th><th>SMS sent</th><th>Points lower with SMS</th></tr></thead><tbody><tr><td>1 to 3 days</td><td>23.00%</td><td>21.30%</td><td>1.70</td></tr><tr><td>4 to 7 days</td><td>27.11%</td><td>23.97%</td><td>3.14</td></tr><tr><td>8 to 14 days</td><td>33.76%</td><td>28.11%</td><td>5.65</td></tr><tr><td>15 to 30 days</td><td>36.87%</td><td>29.80%</td><td>7.07</td></tr><tr><td>31+ days</td><td>37.53%</td><td>30.20%</td><td>7.33</td></tr></tbody></table><p class="table-note">Same-day appointments are left out because none of them received an SMS.</p>
+<figure><img src="../../img/clinic-no-shows.png" alt="Figure 1: No-shows rise with wait time, and SMS reminders pull them back down by 5.6 to 7.3 percentage points for waits of 8 days or more."><figcaption>Figure 1: No-shows rise with wait time, and SMS reminders pull them back down by 5.6 to 7.3 percentage points for waits of 8 days or more.</figcaption></figure>
+<h3>Where the no-shows come from</h3>
+<table><caption>Table 4: Top 5 neighbourhoods by number of no-shows</caption><thead><tr><th>Neighbourhood</th><th>Appointments</th><th>No-shows</th><th>No-show rate</th><th>Cumulative share</th></tr></thead><tbody><tr><td>Jardim Camburi</td><td>7,717</td><td>1,465</td><td>18.98%</td><td>6.57%</td></tr><tr><td>Maria Ortiz</td><td>5,804</td><td>1,219</td><td>21.00%</td><td>12.03%</td></tr><tr><td>Itararé</td><td>3,514</td><td>923</td><td>26.27%</td><td>16.16%</td></tr><tr><td>Resistência</td><td>4,430</td><td>905</td><td>20.43%</td><td>20.22%</td></tr><tr><td>Centro</td><td>3,333</td><td>703</td><td>21.09%</td><td>23.37%</td></tr></tbody></table>
+<p>The top 5 neighbourhoods account for 23.4% of all no-shows. Count and rate tell different stories: Jardim Camburi has the most no-shows simply because it has the most appointments, and its rate is actually below average, while Itararé has a much higher rate. Weekday barely matters, with rates between 19.4% and 21.2% from Monday to Friday.</p>
 
-    <h2>How I built it</h2>
-    <ul>
-      <li>Designed a normalized database (patients, neighbourhoods, appointments) with primary and foreign keys, CHECK constraints, and a computed wait-time column.</li>
-      <li>Built a Python loader with Pandas and SQLAlchemy that validates every row. Rows that break a rule, such as a negative age or an appointment dated before its booking, are saved to a rejects table with the reason instead of being silently dropped.</li>
-      <li>Wrote T-SQL views for each analysis, including a Pareto view using window functions, and a stored procedure that summarizes any date range or neighbourhood.</li>
-    </ul>
-    <ul class="stack">
-      <li>SQL Server</li><li>T-SQL</li><li>Python</li><li>Pandas</li><li>SQLAlchemy</li><li>Docker</li><li>Plotly</li>
-    </ul>
-    <p><a href="https://github.com/ncollum/clinic-no-show-analysis" target="_blank" rel="noopener">View the code on GitHub</a>. Data: Medical Appointment No Shows (Kaggle).</p>
-  </div>
+<h2>What a clinic could do with this</h2>
+<ul>
+<li>Offer same-day or next-few-days slots where possible, since short waits have far fewer no-shows.</li>
+<li>Send SMS reminders for every appointment booked more than a week ahead.</li>
+<li>Look at neighbourhoods with high rates, not just high counts, when planning outreach.</li>
+</ul>
+
+<h2>What I learned</h2>
+<p>The most useful lesson was to check whether a comparison is fair before trusting it. The simple SMS comparison pointed the wrong way, and only grouping by wait time showed the real effect. I also learned how much easier analysis becomes when the database is designed well: with clean keys, constraints and views, every chart on this page is a short query. And I hit a classic SQL Server setting, <code>QUOTED_IDENTIFIER</code>, that has to be on to create a persisted computed column.</p>
+<ul class="stack"><li>SQL Server</li><li>T-SQL</li><li>Python</li><li>Pandas</li><li>SQLAlchemy</li><li>Docker</li><li>Plotly</li></ul>
+
+<a class="back" href="../../projects.html">&larr; Back to all projects</a>
 </main>
 <footer>© 2026 Nancy Bogati Collum</footer>
-
 <script>
 const PURPLE = "#712bd6", ORANGE = "#f2a541", GREY = "#cfc6e4", INK = "#2b2b2b";
 const FONT = {family: "Raleway, Arial, sans-serif", size: 13, color: INK};

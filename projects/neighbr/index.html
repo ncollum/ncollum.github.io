@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neighbr: A Community Map for Windsor | Nancy Bogati Collum</title>
+<meta name="description" content="Neighbr: A Community Map for Windsor, a project by Nancy Bogati Collum.">
+<meta name="theme-color" content="#712bd6">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu&family=Lora:ital@1&family=Raleway:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="../../style.css">
+
+</head>
+<body>
+<header class="navbar"><div class="navbar-inner">
+  <a class="brand" href="../../index.html">Nancy Collum</a>
+  <nav class="nav" aria-label="Main">
+    <a href="../../index.html">about</a>
+    <a href="../../projects.html" class="active" aria-current="page">projects</a>
+    <a href="../../assets/Nancy_Collum_Resume.pdf" target="_blank" rel="noopener">resume</a>
+    <a href="../../contact.html">contact</a>
+  </nav>
+</div></header>
+<main class="post">
+<h1>Neighbr: A Community Map for Windsor</h1>
+<p class="meta"><i class="fas fa-folder"></i>school, team project, client project, angular, typescript</p>
+
+<figure><img src="../../img/neighbr.png" alt="Figure 1: The Neighbr map of downtown Windsor, showing events, groups, local issues, posts and polls. Shown with demo data."><figcaption>Figure 1: The Neighbr map of downtown Windsor, showing events, groups, local issues, posts and polls. Shown with demo data.</figcaption></figure>
+<p>Neighbr is a working prototype of a community web app for Windsor, built by our team for a real client business as part of COMP 8967 at the University of Windsor. It brings everything happening in a neighbourhood onto one map: local events, community groups, businesses, posts, polls, and issues that residents report, such as a broken bench in a park.</p>
+<p class="question">The goal: give Windsor residents one place to see what's happening around them, report local problems, and follow those problems until they are fixed.</p>
+
+<h2>What the app does</h2>
+<ul>
+<li><b>A live map</b> of the neighbourhood, with a different marker for each kind of item and filters like Now, Tonight and This weekend.</li>
+<li><b>Local issues</b> that residents can report and follow. Each issue moves through stages, and the map shows how many people are affected and when an issue is resolved.</li>
+<li><b>Groups, events, businesses, posts and polls</b> so neighbours can organize and talk about local decisions.</li>
+<li><b>Acting for an organization:</b> a user who runs a business or group can switch to acting on its behalf.</li>
+</ul>
+
+<h2>What I built</h2>
+<p>We worked in sprints from a Trello board, with each feature as a card. The features I built in Angular and TypeScript:</p>
+<ul>
+<li><b>App layout and navigation:</b> the main structure and menu every other page sits in.</li>
+<li><b>Profile page and the "acting as" switch:</b> lets a user switch between acting as themselves and as an organization they manage.</li>
+<li><b>Issue stages and timeline:</b> shows each step of an issue's journey, from reported to resolved.</li>
+<li><b>Decline, needs more info, and permissions:</b> the actions an organization can take on an issue, and the rules for who is allowed to take them.</li>
+<li><b>Following posts and issues:</b> so residents get updates on what they care about.</li>
+<li><b>Business-only claiming:</b> only businesses can be claimed by an owner.</li>
+<li><b>Showing who acted for an organization:</b> so it's clear which person took an action on behalf of a group or business.</li>
+</ul>
+
+<h2>Working with a real client</h2>
+<p>Every feature went through a GitHub pull request and was reviewed before merging. In our client demos, I present the issue journey: how a resident reports a problem, how it moves through each stage, and how neighbours follow it. Explaining features to a non-technical client taught me to start from what the user sees and wants, not from how the code works.</p>
+
+<h2>What I learned</h2>
+<p>Building for a real client is different from a class assignment. Requirements change after each demo, so small, well-scoped cards and clean pull requests made it much easier to adjust. I also learned how much permissions matter in a community app: deciding who can decline an issue, claim a business or act for a group is as important as the screens themselves.</p>
+<ul class="stack"><li>Angular</li><li>TypeScript</li><li>Agile</li><li>Trello</li><li>GitHub pull requests</li><li>Client demos</li></ul>
+
+<a class="back" href="../../projects.html">&larr; Back to all projects</a>
+</main>
+<footer>© 2026 Nancy Bogati Collum</footer>
+
+</body>
+</html>

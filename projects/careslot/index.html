@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CareSlot: Helping Patients Find the Right Doctor | Nancy Bogati Collum</title>
+<meta name="description" content="CareSlot: Helping Patients Find the Right Doctor, a project by Nancy Bogati Collum.">
+<meta name="theme-color" content="#712bd6">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu&family=Lora:ital@1&family=Raleway:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="../../style.css">
+
+</head>
+<body>
+<header class="navbar"><div class="navbar-inner">
+  <a class="brand" href="../../index.html">Nancy Collum</a>
+  <nav class="nav" aria-label="Main">
+    <a href="../../index.html">about</a>
+    <a href="../../projects.html" class="active" aria-current="page">projects</a>
+    <a href="../../assets/Nancy_Collum_Resume.pdf" target="_blank" rel="noopener">resume</a>
+    <a href="../../contact.html">contact</a>
+  </nav>
+</div></header>
+<main class="post">
+<h1>CareSlot: Helping Patients Find the Right Doctor</h1>
+<p class="meta"><i class="fas fa-folder"></i>school, team project, web development, django, data modeling</p>
+
+<figure><img src="../../img/careslot/model.png" alt="Figure 1: The data model I designed for the doctors module."><figcaption>Figure 1: The data model I designed for the doctors module.</figcaption></figure>
+<p>CareSlot is a clinic appointment booking website built by a team of five for COMP 8347 at the University of Windsor. Patients can find a doctor, see open time slots and book a visit online. I owned the doctors module: the data model behind every doctor, clinic and specialty, the sample data, and the pages patients use to find the right doctor.</p>
+<p class="question">The goal: a patient who doesn't know which kind of doctor they need should still be able to type what's wrong, like "rash", and find someone who can help, in a language they speak, at a clinic near them.</p>
+
+<h2>Designing the data model</h2>
+<p>A doctor belongs to one specialty and works at one clinic, and can speak several languages, so I used two many-to-one links and one many-to-many link. Each specialty also stores a list of symptom keywords, which is what makes searching by symptom possible.</p>
+<pre><code><span class="k">class</span> Doctor(models.Model):
+  name = models.CharField(max_length=<span class="n">100</span>)
+  specialty = models.ForeignKey(Specialty, on_delete=models.PROTECT, related_name=<span class="s">&#x27;doctors&#x27;</span>)
+  clinic = models.ForeignKey(Clinic, on_delete=models.PROTECT, related_name=<span class="s">&#x27;doctors&#x27;</span>)
+  languages = models.ManyToManyField(Language, related_name=<span class="s">&#x27;doctors&#x27;</span>)
+  bio = models.TextField(blank=<span class="k">True</span>)
+  photo = models.ImageField(upload_to=<span class="s">&#x27;doctors/&#x27;</span>, blank=<span class="k">True</span>)</code></pre>
+<p>I used <code>PROTECT</code> on the foreign keys so a clinic or specialty can't be deleted while doctors still depend on it, which keeps the data consistent. I also wrote fixtures with 12 doctors, 6 specialties, 6 languages and 3 clinics, so every teammate could load the same realistic sample data with one command.</p>
+
+<h2>Building the search</h2>
+<p>The doctor list page combines a free-text search with filters for specialty, clinic and language. A single search box matches the doctor's name, their specialty, or the symptom keywords of that specialty:</p>
+<pre><code><span class="k">def</span> get_queryset(<span class="k">self</span>):
+  doctors = Doctor.objects.select_related(<span class="s">&#x27;specialty&#x27;</span>, <span class="s">&#x27;clinic&#x27;</span>).prefetch_related(<span class="s">&#x27;languages&#x27;</span>)
+
+  <span class="k">self</span>.search_form = DoctorSearchForm(<span class="k">self</span>.request.GET)
+  <span class="k">self</span>.filter_form = DoctorFilterForm(<span class="k">self</span>.request.GET)
+  <span class="c"># A bad value in the URL is left out instead of causing an error</span>
+  <span class="k">self</span>.search_form.is_valid()
+  <span class="k">self</span>.filter_form.is_valid()
+
+  <span class="k">self</span>.q = <span class="k">self</span>.search_form.cleaned_data.get(<span class="s">&#x27;q&#x27;</span>, <span class="s">&#x27;&#x27;</span>).strip()
+  specialty = <span class="k">self</span>.filter_form.cleaned_data.get(<span class="s">&#x27;specialty&#x27;</span>)
+  clinic = <span class="k">self</span>.filter_form.cleaned_data.get(<span class="s">&#x27;clinic&#x27;</span>)
+  language = <span class="k">self</span>.filter_form.cleaned_data.get(<span class="s">&#x27;language&#x27;</span>)
+
+  <span class="k">if</span> <span class="k">self</span>.q:
+    doctors = doctors.filter(
+      Q(name__icontains=<span class="k">self</span>.q) | Q(specialty__name__icontains=<span class="k">self</span>.q) | Q(specialty__keywords__icontains=<span class="k">self</span>.q)
+    )
+  <span class="k">if</span> specialty:
+    doctors = doctors.filter(specialty=specialty)
+  <span class="k">if</span> clinic:
+    doctors = doctors.filter(clinic=clinic)
+  <span class="k">if</span> language:
+    doctors = doctors.filter(languages=language)</code></pre>
+<p>A few details I'm proud of:</p>
+<ul>
+<li><b>Fast pages:</b> <code>select_related</code> and <code>prefetch_related</code> load each doctor's specialty, clinic and languages in a few queries instead of one query per doctor.</li>
+<li><b>No crashes from bad links:</b> an invalid value in the web address is ignored instead of causing an error.</li>
+<li><b>Remembering the patient:</b> the last search and the 5 most recently viewed doctors are saved in the session.</li>
+<li><b>Pagination that keeps filters:</b> 6 doctors per page, and the page links keep the current search.</li>
+</ul>
+
+<h2>How we worked</h2>
+<p>Our team of five split the site into apps (accounts, doctors, appointments, records and articles), tracked tasks on a shared Trello board, and worked through GitHub. The doctors module had to be ready early, because the appointments app builds its time slots on top of the Doctor model.</p>
+
+<h2>What I learned</h2>
+<p>Good data modeling makes everything after it easier. Choosing the right relationships and delete rules up front meant the search, the detail pages and my teammates' booking features all worked without changes to the model. I also learned to think about query counts early, since a list page can quietly run dozens of queries without <code>select_related</code>.</p>
+<ul class="stack"><li>Python</li><li>Django</li><li>SQLite</li><li>Data modeling</li><li>HTML/CSS</li><li>Git</li><li>Trello</li></ul>
+
+<a class="back" href="../../projects.html">&larr; Back to all projects</a>
+</main>
+<footer>© 2026 Nancy Bogati Collum</footer>
+
+</body>
+</html>

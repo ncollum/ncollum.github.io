@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Building a Crime Data Warehouse for UK Police Stations | Nancy Bogati Collum</title>
+<meta name="description" content="Building a Crime Data Warehouse for UK Police Stations, a project by Nancy Bogati Collum.">
+<meta name="theme-color" content="#712bd6">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu&family=Lora:ital@1&family=Raleway:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="../../style.css">
+
+</head>
+<body>
+<header class="navbar"><div class="navbar-inner">
+  <a class="brand" href="../../index.html">Nancy Collum</a>
+  <nav class="nav" aria-label="Main">
+    <a href="../../index.html">about</a>
+    <a href="../../projects.html" class="active" aria-current="page">projects</a>
+    <a href="../../assets/Nancy_Collum_Resume.pdf" target="_blank" rel="noopener">resume</a>
+    <a href="../../contact.html">contact</a>
+  </nav>
+</div></header>
+<main class="post">
+<h1>Building a Crime Data Warehouse for UK Police Stations</h1>
+<p class="meta"><i class="fas fa-folder"></i>school, data warehousing, ETL, oracle sql, PL/SQL</p>
+
+<figure><img src="../../img/crime/star_schema.png" alt="Figure 1: The star schema I designed for the crime data mart: one fact table of crime inspections, surrounded by crime, police officer, station and time dimensions."><figcaption>Figure 1: The star schema I designed for the crime data mart: one fact table of crime inspections, surrounded by crime, police officer, station and time dimensions.</figcaption></figure>
+<p>Police stations across England and Wales record every reported crime, from new cases to ones that stay open for more than a year. But the data lived in two separate systems, one for English police (PRCS) and one for Wales, with similar but not identical structures. For my Advanced Database Systems module at Leeds Beckett University, I designed and built a data warehouse in Oracle that brings both systems together so managers can track crime and case closures in one place.</p>
+<p class="question">The goal: give regional stations one reliable source of truth to answer questions like how many crimes are closed each month, how many cases are still ongoing, and which stations have the most escalated cases, so they can work towards their targets of reducing crime and closing more cases.</p>
+
+<h2>Methods</h2>
+<h3>Designing the data mart</h3>
+<p>I followed the Kimball approach and chose a star schema over a snowflake schema, because analysts need fast, simple queries more than they need fully normalized tables. The fact table holds one row per crime inspection, with the number of closed and ongoing cases as its measures. Around it sit four dimensions: crime (type, status, reported and closed dates), police officer, station and time. I documented every column in a data dictionary, including where it comes from and how it is transformed, so a new team could understand and extend the model.</p>
+<h3>The ETL pipeline</h3>
+<p>The pipeline runs in five stages, each written as PL/SQL procedures in Oracle Application Express:</p>
+<ul>
+<li><b>Staging:</b> pull crime, officer and station records from both source systems into staging tables, with sequences and triggers generating surrogate keys.</li>
+<li><b>Separating clean and bad data:</b> check every staged row against quality rules and split it into a clean table or a bad table.</li>
+<li><b>Re-cleaning:</b> fix the bad rows where possible and move them back into the clean table.</li>
+<li><b>Transforming:</b> copy the clean data into transform tables shaped for the warehouse.</li>
+<li><b>Loading:</b> load the dimension tables and then the fact table, looking up each surrogate key.</li>
+</ul>
+<h3>1. Staging data from two systems</h3>
+<p>The English system splits a reported crime across several normalized tables, so the staging step joins them back together. A <code>MERGE</code> statement only inserts records that aren't already staged, so the procedure can safely run again. A <code>DB_SOURCE</code> column records which system each row came from:</p>
+<pre><code><span class="c">-- Merge English (PRCS) crime records into the staging table</span>
+MERGE INTO STAGE_CRIME TARGET_CRIME   
+USING (<span class="k">SELECT</span> C_REPORTED.REPORTED_CRIME_ID, C_TYPE.CRIME_TYPE_DESC, C_REPORTED.CRIME_STATUS,C_REPORTED.DATE_REPORTED,
+              C_REPORTED.DATE_CLOSED, P_ALLOCATION.D_EMP_ID , C_REPORTED.FK2_STATION_ID
+       <span class="k">FROM</span> PL_REPORTED_CRIME C_REPORTED 
+       INNER <span class="k">JOIN</span>  PL_CRIME_TYPE C_TYPE 
+       <span class="k">ON</span>  C_REPORTED.FK1_CRIME_TYPE_ID = C_TYPE.CRIME_TYPE_ID
+FULL <span class="k">JOIN</span> PL_WORK_ALLOCATION P_ALLOCATION
+       <span class="k">ON</span> P_ALLOCATION.S_REPORTED_CRIME_ID = C_REPORTED.REPORTED_CRIME_ID) SOURCE_CRIME
+       <span class="k">ON</span> (TARGET_CRIME.CRIME_CODE = SOURCE_CRIME.REPORTED_CRIME_ID 
+       <span class="k">AND</span> TARGET_CRIME.POLICE_OFFICER_ID = SOURCE_CRIME.D_EMP_ID)
+<span class="k">WHEN</span> NOT MATCHED <span class="k">THEN</span>
+ INSERT (CRIME_CODE, CRIME_NAME, CRIME_STATUS, REPORTED_DATE, CLOSED_DATE, POLICE_OFFICER_ID, STATION_ID, DB_SOURCE )
+ VALUES (SOURCE_CRIME.REPORTED_CRIME_ID , SOURCE_CRIME.CRIME_TYPE_DESC, SOURCE_CRIME.CRIME_STATUS, 
+ TO_DATE(SOURCE_CRIME.DATE_REPORTED, <span class="s">&#x27;MM/DD/YY&#x27;</span>), TO_DATE(SOURCE_CRIME.DATE_CLOSED, <span class="s">&#x27;MM/DD/YY&#x27;</span>), SOURCE_CRIME.D_EMP_ID ,SOURCE_CRIME.FK2_STATION_ID, <span class="s">&#x27;prcs&#x27;</span>);</code></pre>
+<h3>2. Separating clean and bad data</h3>
+<p>Real data has gaps: missing crime names, missing officers, or a case that closed before it was reported. Instead of loading everything, a procedure checks each row and sends it to a clean or a bad table. A closed crime needs both dates in the right order, while an open or escalated crime must not have a closed date yet:</p>
+<pre><code><span class="c">-- Inside a cursor loop over every staged crime record</span>
+IF VAR.CRIME_NAME IS <span class="k">NOT NULL</span> <span class="k">AND</span> VAR.POLICE_OFFICER_ID IS <span class="k">NOT NULL</span> <span class="k">THEN</span> 
+   IF VAR.CRIME_STATUS = <span class="s">&#x27;CLOSED&#x27;</span> <span class="k">AND</span> VAR.REPORTED_DATE IS <span class="k">NOT NULL</span> <span class="k">AND</span> VAR.CLOSED_DATE IS <span class="k">NOT NULL</span> 
+   <span class="k">AND</span> TO_DATE(VAR.REPORTED_DATE, <span class="s">&#x27;mm/dd/yyyy&#x27;</span>) &lt;= TO_DATE(VAR.CLOSED_DATE, <span class="s">&#x27;mm/dd/yyyy&#x27;</span>) <span class="k">THEN</span> 
+       INSERT INTO CLEAN_CRIME_DATA
+       VALUES (VAR.CRIME_ID,VAR.CRIME_CODE, VAR.CRIME_NAME, VAR.CRIME_STATUS, VAR.REPORTED_DATE,
+               VAR.CLOSED_DATE, VAR.POLICE_OFFICER_ID, VAR.STATION_ID, VAR.DB_SOURCE);
+   ELSIF VAR.CRIME_STATUS= <span class="s">&#x27;OPEN&#x27;</span> <span class="k">OR</span> VAR.CRIME_STATUS = <span class="s">&#x27;ESCALATE&#x27;</span> <span class="k">AND</span> VAR.CLOSED_DATE IS NULL <span class="k">AND</span>
+         VAR.REPORTED_DATE IS <span class="k">NOT NULL</span> <span class="k">THEN</span>
+
+        INSERT INTO CLEAN_CRIME_DATA   
+        VALUES (VAR.CRIME_ID, VAR.CRIME_CODE, VAR.CRIME_NAME, VAR.CRIME_STATUS, VAR.REPORTED_DATE,
+               VAR.CLOSED_DATE, VAR.POLICE_OFFICER_ID, VAR.STATION_ID, VAR.DB_SOURCE);    
+           <span class="k">ELSE</span>
+       INSERT INTO BAD_CRIME_DATA 
+       VALUES(VAR.CRIME_ID, VAR.CRIME_CODE, VAR.CRIME_NAME, VAR.CRIME_STATUS, VAR.REPORTED_DATE,
+              VAR.CLOSED_DATE, VAR.POLICE_OFFICER_ID, VAR.STATION_ID, VAR.DB_SOURCE);         
+    <span class="k">END</span> IF;
+    <span class="k">ELSE</span>
+       INSERT INTO BAD_CRIME_DATA 
+       VALUES(VAR.CRIME_ID, VAR.CRIME_CODE, VAR.CRIME_NAME, VAR.CRIME_STATUS, VAR.REPORTED_DATE,
+              VAR.CLOSED_DATE, VAR.POLICE_OFFICER_ID, VAR.STATION_ID, VAR.DB_SOURCE);       
+    <span class="k">END</span> IF;</code></pre>
+<h3>3. Re-cleaning and testing with bad data</h3>
+<p>The source data had very few errors, so to prove the re-cleaning worked I deliberately updated staging rows with errors, such as missing officer names, invalid genders and missing station names. Re-cleaning procedures then fixed what they could (for example, setting a missing crime name to "UNDEFINED") and moved the rows back into the clean tables.</p>
+<h3>4. Loading the warehouse</h3>
+<p>The load procedures use <code>MERGE</code> as an upsert: new records are inserted and existing ones are updated, so a crime that changes from open to closed is updated rather than duplicated. The time dimension is built from the distinct months and years in the crime data:</p>
+<pre><code><span class="k">CREATE</span> <span class="k">OR</span> REPLACE PROCEDURE LOAD_TIME_DIM
+<span class="k">AS</span> 
+BEGIN
+    MERGE INTO DIM_TIME D_TIME
+    USING  (
+        <span class="k">SELECT</span> DISTINCT TO_CHAR(REPORTED_DATE, <span class="s">&#x27;YYYY&#x27;</span>) <span class="k">YEAR</span>,
+        TO_CHAR(REPORTED_DATE, <span class="s">&#x27;MM&#x27;</span>) MONTH
+        <span class="k">FROM</span> TRANSFORM_CRIME
+    )S_CRIME
+    <span class="k">ON</span> 
+    (  
+        D_TIME.<span class="k">YEAR</span> = S_CRIME.<span class="k">YEAR</span> <span class="k">AND</span>
+        D_TIME.MONTH = S_CRIME.MONTH
+    )
+    <span class="k">WHEN</span> NOT MATCHED <span class="k">THEN</span>
+        INSERT (MONTH, <span class="k">YEAR</span>)
+        VALUES (S_CRIME.month, S_CRIME.year);
+<span class="k">END</span> LOAD_TIME_DIM;</code></pre>
+<p>Finally, a procedure loads the fact table by looking up the surrogate key for each crime, station, officer and month, and counts closed and ongoing cases.</p>
+
+<h2>Results</h2>
+<p>The finished data mart supports five reports built around the stations' targets:</p>
+<ul>
+<li>Number of each type of crime closed per year</li>
+<li>Number of closed crimes per month</li>
+<li>Number of each type of ongoing case per year</li>
+<li>Number of closed cases per station</li>
+<li>Number of escalated cases per station</li>
+</ul>
+<figure><img src="../../img/crime/excel_chart.png" alt="Figure 2: Reported crimes by type per month, from October 2017 to March 2019, summarized in Excel as part of the project."><figcaption>Figure 2: Reported crimes by type per month, from October 2017 to March 2019, summarized in Excel as part of the project.</figcaption></figure>
+<p>The monthly summary shows that "other theft" is by far the most common category, usually between about 500 and 640 cases a month, while robbery and drug offences stay the lowest. Violent crime, burglary and vehicle crime sit in between, mostly around 150 to 300 a month.</p>
+
+<h2>What I learned</h2>
+<p>This project taught me that most of the work in a data warehouse is in the ETL, not the schema. Combining two systems that look similar but aren't, deciding what counts as bad data, and making every step safe to re-run took far more time than drawing the star schema. It's also where I first learned to keep bad data in its own table with a reason instead of deleting it, an idea I still use in my projects today.</p>
+<ul class="stack"><li>Oracle SQL</li><li>PL/SQL</li><li>Oracle APEX</li><li>Star schema</li><li>ETL</li><li>Data dictionary</li><li>Excel</li></ul>
+
+<a class="back" href="../../projects.html">&larr; Back to all projects</a>
+</main>
+<footer>© 2026 Nancy Bogati Collum</footer>
+
+</body>
+</html>

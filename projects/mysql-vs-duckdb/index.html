@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>When Does MySQL Stop Being Good Enough for Analytics? | Nancy Bogati Collum</title>
+<meta name="description" content="When Does MySQL Stop Being Good Enough for Analytics?, a project by Nancy Bogati Collum.">
+<meta name="theme-color" content="#712bd6">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu&family=Lora:ital@1&family=Raleway:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="../../style.css">
+
+</head>
+<body>
+<header class="navbar"><div class="navbar-inner">
+  <a class="brand" href="../../index.html">Nancy Collum</a>
+  <nav class="nav" aria-label="Main">
+    <a href="../../index.html">about</a>
+    <a href="../../projects.html" class="active" aria-current="page">projects</a>
+    <a href="../../assets/Nancy_Collum_Resume.pdf" target="_blank" rel="noopener">resume</a>
+    <a href="../../contact.html">contact</a>
+  </nav>
+</div></header>
+<main class="post">
+<h1>When Does MySQL Stop Being Good Enough for Analytics?</h1>
+<p class="meta"><i class="fas fa-folder"></i>school, team project, database benchmarking, python, sql</p>
+
+<figure><img src="../../img/bench/latency.png" alt="Figure 1: Median query time on the transactional (OLTP) schema with a full table scan. Note the log scale: each grid line is 10 times slower. MySQL at SF-10 was not completed."><figcaption>Figure 1: Median query time on the transactional (OLTP) schema with a full table scan. Note the log scale: each grid line is 10 times slower. MySQL at SF-10 was not completed.</figcaption></figure>
+<p>Most companies start with a regular transactional database like MySQL, and at some point their reports and dashboards get too slow. In this team project for COMP 8157 (Advanced Database Topics) at the University of Windsor, we measured exactly where that point is, by running the same analytical queries on MySQL, a row-store built for transactions, and DuckDB, a column-store built for analytics, at three data sizes.</p>
+<p class="question">The question: at what data size and query shape does a row-store database stop being good enough for analytics, compared to a column-store? And does reshaping the data into a star schema help either engine?</p>
+
+<h2>Methods</h2>
+<h3>Data and scale</h3>
+<p>We used TPC-H, the standard decision-support benchmark, generated at three scale factors: SF-1 (about 6 million line items), SF-5 (about 30 million) and SF-10 (about 60 million). The raw data was loaded into both engines in its normal transactional form.</p>
+<figure><img src="../../img/bench/schema.png" alt="Figure 2: The TPC-H schema, with row counts at scale factor 1. LINEITEM is the large table that every heavy query has to scan."><figcaption>Figure 2: The TPC-H schema, with row counts at scale factor 1. LINEITEM is the large table that every heavy query has to scan.</figcaption></figure>
+<h3>From transactions to analytics</h3>
+<p>We then transformed the data, identically in both engines, into an analytics-ready star schema (a fact table with dimension tables) plus a wide denormalized view, and measured how long that took and how much disk it used. This let us test both layers: the original transactional schema and the new analytical one.</p>
+<h3>The query matrix</h3>
+<p>Every combination was run several times: 2 engines, 2 schema layers, 3 scale factors, 3 query shapes (single GROUP BY, multi-column GROUP BY and a nested subquery) and 3 ways of reaching the data (full table scan, an indexed point lookup and a three-month range scan). For each run we recorded latency, peak memory and CPU, and reported the median. This is the heaviest query shape, on the transactional schema:</p>
+<pre><code><span class="k">SELECT</span> s.s_name, n.n_name, <span class="k">YEAR</span>(l.l_shipdate) <span class="k">AS</span> ship_year, <span class="k">SUM</span>(l.l_extendedprice * (<span class="n">1</span> - l.l_discount)) <span class="k">AS</span> revenue
+<span class="k">FROM</span> lineitem l
+<span class="k">JOIN</span> supplier s <span class="k">ON</span> l.l_suppkey = s.s_suppkey
+<span class="k">JOIN</span> nation n <span class="k">ON</span> s.s_nationkey = n.n_nationkey
+<span class="k">GROUP BY</span> s.s_name, n.n_name, ship_year
+<span class="k">ORDER BY</span> revenue <span class="k">DESC</span>
+<span class="k">LIMIT</span> <span class="n">100</span>;</code></pre>
+<h3>My part: the query executor</h3>
+<p>I led the query execution and metrics layer, which runs the whole matrix and records every trial. The trickiest part was adding the index-mode filter to each query automatically. Two earlier approaches broke on the nested subquery, because the filter landed in a block that couldn't see the right columns. The final version targets the block that actually scans the fact table:</p>
+<pre><code>INDEX_MODE_PREDICATES = {
+    <span class="s">&quot;full_scan&quot;</span>: <span class="s">&quot;&quot;</span>,
+    <span class="s">&quot;indexed_point_lookup&quot;</span>: <span class="s">&quot; AND l_orderkey = 1&quot;</span>,
+    <span class="s">&quot;range_scan&quot;</span>: <span class="s">&quot; AND l_shipdate BETWEEN DATE &#x27;1996-01-01&#x27; AND DATE &#x27;1996-03-31&#x27;&quot;</span>,
+}
+
+
+<span class="k">def</span> _apply_index_mode(sql: str, index_mode: str) -&gt; str:
+    predicate = INDEX_MODE_PREDICATES[index_mode]
+    <span class="k">if</span> <span class="k">not</span> predicate:
+        <span class="k">return</span> sql
+    <span class="c"># Anchor on the FIRST GROUP BY, which always belongs to the block that</span>
+    <span class="c"># actually scans the base fact/lineitem table in every query template</span>
+    <span class="c"># in this matrix (even nested_subquery&#x27;s outer WHERE references columns</span>
+    <span class="c"># from the derived table, not the base table, so injecting there would</span>
+    <span class="c"># produce an unresolvable column reference). Only look for an existing</span>
+    <span class="c"># WHERE within that same block (before the first GROUP BY) - a WHERE</span>
+    <span class="c"># appearing later, in an outer/sibling scope, doesn&#x27;t apply here.</span>
+    condition = predicate.strip()
+    gb_match = re.search(r<span class="s">&quot;\bGROUP BY\b&quot;</span>, sql, re.IGNORECASE)
+    <span class="k">if</span> <span class="k">not</span> gb_match:
+        <span class="k">return</span> sql
+    prefix = sql[:gb_match.start()]
+    <span class="k">if</span> re.search(r<span class="s">&quot;\bWHERE\b&quot;</span>, prefix, re.IGNORECASE):
+        <span class="k">return</span> sql[:gb_match.start()] + f<span class="s">&quot;{condition}\n&quot;</span> + sql[gb_match.start():]
+    <span class="k">return</span> sql[:gb_match.start()] + f<span class="s">&quot;WHERE 1=1 {condition}\n&quot;</span> + sql[gb_match.start():]</code></pre>
+
+<h2>Results</h2>
+<h3>DuckDB scales, MySQL falls behind fast</h3>
+<table><caption>Table 1: Multi-column GROUP BY with a full table scan, transactional schema (median time)</caption><thead><tr><th>Data size</th><th>MySQL</th><th>DuckDB</th><th>DuckDB faster by</th></tr></thead><tbody><tr><td>SF-1 (about 6M line items)</td><td>59.9 s</td><td>0.32 s</td><td>187x</td></tr><tr><td>SF-5 (about 30M line items)</td><td>5,935 s (about 99 min)</td><td>2.29 s</td><td>2,593x</td></tr><tr><td>Slowdown from SF-1 to SF-5</td><td>about 99x</td><td>about 7x</td><td></td></tr></tbody></table>
+<p>At SF-5, DuckDB was about <b>2,600 times faster</b> on heavy aggregation. Five times more data made MySQL about 99 times slower, while DuckDB slowed down only about 7 times, close to the growth of the data itself.</p>
+<h3>How you reach the data matters even more than the engine</h3>
+<figure><img src="../../img/bench/index_modes.png" alt="Figure 3: The same MySQL aggregation at SF-5 took about 99 minutes as a full scan, 5 minutes as a range scan and 0.02 seconds as an indexed point lookup."><figcaption>Figure 3: The same MySQL aggregation at SF-5 took about 99 minutes as a full scan, 5 minutes as a range scan and 0.02 seconds as an indexed point lookup.</figcaption></figure>
+<p>In MySQL, the same query went from about 99 minutes to about 0.02 seconds when it could use an index to find a single order, a difference of roughly 300,000 times. For a row-store, good indexing and narrow filters matter more than anything else.</p>
+<h3>The star schema did not always help</h3>
+<table><caption>Table 2: Time to build the star schema from the transactional data</caption><thead><tr><th>Data size</th><th>MySQL</th><th>DuckDB</th></tr></thead><tbody><tr><td>SF-1</td><td>8.2 min</td><td>2.1 s</td></tr><tr><td>SF-5</td><td>2.4 h</td><td>7.2 s</td></tr><tr><td>SF-10</td><td>not completed</td><td>11.0 s</td></tr></tbody></table>
+<p>The star schema made DuckDB about 2.2 to 2.4 times faster on single GROUP BY and nested subqueries, but slightly slower on the multi-column GROUP BY. MySQL gained only about 1.1 times. Building it took seconds in DuckDB and hours in MySQL, although in MySQL it also shrank the on-disk size at SF-5 from about 8.18 GB to 6.66 GB. The right design depends on both the engine and the queries you run.</p>
+<h3>Limitations</h3>
+<p>MySQL at SF-10 was not completed: the roughly 22 GB of raw data plus MySQL's on-disk footprint went over our machine's space during loading. Our report documents this instead of estimating the missing results.</p>
+
+<h2>My contributions</h2>
+<p>This was a four-person team project (Rabiya Javed Farooq, Purab Singh Mohan, Sneha Gunturu and me), supervised by Dr. Andreas S. Maniatis. I was the lead contributor, with about 20 of the project's 32 commits:</p>
+<ul>
+<li><b>Team coordination:</b> planned the phases, split the tasks, tracked deadlines and merged work into the main branch.</li>
+<li><b>Query executor and run configuration:</b> runs the full matrix and records latency, memory and CPU for every trial.</li>
+<li><b>Smoke tests:</b> quick checks that the configuration and query matrix are valid before starting runs that take hours.</li>
+<li><b>Ran the benchmarks:</b> all DuckDB runs and all MySQL runs at SF-1 and SF-5. Single MySQL queries at SF-5 took over 90 minutes, so I backed up results between runs.</li>
+<li><b>Analysis, charts and documents:</b> the median summary, all result charts, the pre-proposal, the proposal (IEEE LaTeX and slides), the midterm report, and co-authoring the final report.</li>
+</ul>
+
+<h2>What I learned</h2>
+<p>Benchmarks are only as good as their setup. Small details, like where a filter is inserted into a query or whether the cache is cleared between runs, change the results. I also learned to report what didn't finish honestly instead of filling the gap with a guess.</p>
+<ul class="stack"><li>Python</li><li>MySQL 8.0</li><li>DuckDB</li><li>SQL</li><li>Star schema</li><li>TPC-H</li><li>Pandas</li><li>Matplotlib</li><li>pytest</li></ul>
+
+<a class="back" href="../../projects.html">&larr; Back to all projects</a>
+</main>
+<footer>© 2026 Nancy Bogati Collum</footer>
+
+</body>
+</html>

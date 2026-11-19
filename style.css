@@ -87,3 +87,33 @@ footer{border-top:1px solid var(--line);text-align:center;color:var(--muted);fon
 .ul-edu .course{font-weight:400}
 .ul-edu .inst{font-size:18px}
 @media (max-width:860px){.about{grid-template-columns:1fr}.profile{order:-1}.profile h2{margin-top:24px}.bio{font-size:18px}}
+
+/* project write-up pages */
+.post{max-width:900px;margin:0 auto;padding:70px 24px 100px;color:var(--ink)}
+.post h1{font:400 clamp(36px,5vw,58px)/1.18 "Raleway",sans-serif;margin:0 0 18px}
+.post .meta{color:var(--muted);font-size:15px;margin:0 0 36px}
+.post .meta i{margin-right:6px}
+.post p,.post li{font-size:19px;line-height:1.8}
+.post p{margin:0 0 22px}
+.post h2{font:400 44px/1.2 "Raleway",sans-serif;margin:56px 0 18px}
+.post h3{font:400 30px/1.25 "Raleway",sans-serif;margin:40px 0 14px}
+.post .question{font-style:italic;font-size:22px;line-height:1.6;margin:30px 0}
+.post figure{margin:30px 0 34px;text-align:center}
+.post figure img{max-width:100%;height:auto;box-shadow:0 2px 12px rgba(0,0,0,.12)}
+.post figcaption{font-size:15px;color:var(--muted);margin-top:10px;line-height:1.5}
+.post pre{background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.08);padding:18px 20px;overflow-x:auto;font:400 14px/1.75 "Courier New",Menlo,monospace;letter-spacing:.02em;color:#444;margin:24px 0 30px}
+.post pre .c{color:#999}.post pre .s{color:#7a9a2c}.post pre .n{color:#e0892b}.post pre .k{color:#712bd6}
+.post code{font:400 .9em Menlo,monospace;background:#f3effb;padding:1px 5px;border-radius:3px}
+.post table{border-collapse:collapse;margin:24px 0 8px;width:100%;font:16px Georgia,"Times New Roman",serif}
+.post caption{caption-side:top;text-align:left;font:15px "Raleway",sans-serif;color:var(--muted);padding-bottom:8px}
+.post thead th{border-top:2px solid #222;border-bottom:1px solid #222;padding:10px 12px;text-align:right;font-weight:400}
+.post th:first-child,.post td:first-child{text-align:left}
+.post td{padding:10px 12px;text-align:right;border-bottom:1px solid #eee}
+.post tbody tr:nth-child(even){background:#faf8fe}
+.post tbody tr:last-child td{border-bottom:2px solid #222}
+.post .table-note{font-size:14px;color:var(--muted);margin:0 0 30px}
+.post .stack{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin:20px 0}
+.post .stack li{background:#f1ecfb;color:var(--purple);border-radius:999px;padding:4px 14px;font-size:16px;line-height:1.6}
+.post .back{display:inline-block;margin-top:40px;font-weight:600}
+@media (max-width:700px){.post p,.post li{font-size:17px}.post h2{font-size:34px}.post .question{font-size:19px}.post table{font-size:14px}}
+.post pre code{background:none;padding:0;font:inherit;border-radius:0}

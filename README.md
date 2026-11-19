@@ -1,3 +1,3 @@
 # ncollum.github.io
 
-My portfolio website, hosted on GitHub Pages.
+My portfolio website, hosted on github.

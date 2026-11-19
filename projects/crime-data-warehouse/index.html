@@ -25,10 +25,10 @@
 </div></header>
 <main class="post">
 <h1>Building a Crime Data Warehouse for UK Police Stations</h1>
-<p class="meta"><i class="fas fa-folder"></i>school, data warehousing, ETL, oracle sql, PL/SQL</p>
+<p class="meta"><i class="fas fa-folder"></i>school, data warehousing, ETL, PL/SQL, tableau, oracle apex</p>
 
 <figure><img src="../../img/crime/star_schema.png" alt="Figure 1: The star schema I designed for the crime data mart: one fact table of crime inspections, surrounded by crime, police officer, station and time dimensions."><figcaption>Figure 1: The star schema I designed for the crime data mart: one fact table of crime inspections, surrounded by crime, police officer, station and time dimensions.</figcaption></figure>
-<p>Police stations across England and Wales record every reported crime, from new cases to ones that stay open for more than a year. But the data lived in two separate systems, one for English police (PRCS) and one for Wales, with similar but not identical structures. For my Advanced Database Systems module at Leeds Beckett University, I designed and built a data warehouse in Oracle that brings both systems together so managers can track crime and case closures in one place.</p>
+<p>Police stations across England and Wales record every reported crime, from new cases to ones that stay open for more than a year. But the data lived in two separate systems, one for English police (PRCS) and one for Wales, with similar but not identical structures. For my Advanced Database Systems module at Leeds Beckett University, I designed and built a data warehouse in Oracle that brings both systems together, then built dashboards in Oracle APEX, Tableau and Excel so managers can track crime and case closures in one place.</p>
 <p class="question">The goal: give regional stations one reliable source of truth to answer questions like how many crimes are closed each month, how many cases are still ongoing, and which stations have the most escalated cases, so they can work towards their targets of reducing crime and closing more cases.</p>
 
 <h2>Methods</h2>
@@ -109,21 +109,27 @@ BEGIN
 <span class="k">END</span> LOAD_TIME_DIM;</code></pre>
 <p>Finally, a procedure loads the fact table by looking up the surrogate key for each crime, station, officer and month, and counts closed and ongoing cases.</p>
 
-<h2>Results</h2>
-<p>The finished data mart supports five reports built around the stations' targets:</p>
+<h2>Part 2: Turning the warehouse into dashboards</h2>
+<p>In the second part of the module, I used the warehouse to report on the stations' KPI of closing crimes. I joined the fact table with all four dimensions into one reporting table, then built the same analysis in three tools: Oracle APEX, Excel and Tableau.</p>
+<h3>Oracle APEX dashboard</h3>
+<figure><img src="../../img/crime/apex_dashboard.png" alt="Figure 2: The Closed Crime Analysis dashboard I built in Oracle APEX, with open, escalated and closed crime counts and four summary charts."><figcaption>Figure 2: The Closed Crime Analysis dashboard I built in Oracle APEX, with open, escalated and closed crime counts and four summary charts.</figcaption></figure>
+<p>The APEX dashboard gives a quick overview: 62 open crimes, 17 escalated crimes and 42 closed crimes, along with open cases by crime type, closed crimes per station, closed cases by month over the last 12 months, and closed cases by crime type. Behind it, I built nine filterable APEX reports, such as closed crimes per station with the average time taken to close them, the officers who closed the most cases each year, and open cases with the number of officers assigned.</p>
+<figure><img src="../../img/crime/apex_open_closed.png" alt="Figure 3: Open and closed cases for each station, filterable by year, in Oracle APEX."><figcaption>Figure 3: Open and closed cases for each station, filterable by year, in Oracle APEX.</figcaption></figure>
+<h3>Tableau dashboard</h3>
+<figure><img src="../../img/crime/tableau_dashboard.png" alt="Figure 4: The Crimes Analysis dashboard I built in Tableau, combining five reports on how long stations and officers take to close each type of crime."><figcaption>Figure 4: The Crimes Analysis dashboard I built in Tableau, combining five reports on how long stations and officers take to close each type of crime.</figcaption></figure>
+<p>The Tableau dashboard focuses on time to close. A few things stood out:</p>
 <ul>
-<li>Number of each type of crime closed per year</li>
-<li>Number of closed crimes per month</li>
-<li>Number of each type of ongoing case per year</li>
-<li>Number of closed cases per station</li>
-<li>Number of escalated cases per station</li>
+<li><b>Violent crime takes the longest to close,</b> followed by robbery and drunk and disorderly offences, which tells managers where to focus resources.</li>
+<li><b>Meanwood station closed by far the most crimes</b> (3,906), compared with 798 at Lawnswood.</li>
+<li><b>Data quality shows up in the reports.</b> Records that were re-cleaned as "UNDEFINED" or "unknown" still appear in the charts, which is a reminder that cleaning rules decide what a dashboard can say.</li>
 </ul>
-<figure><img src="../../img/crime/excel_chart.png" alt="Figure 2: Reported crimes by type per month, from October 2017 to March 2019, summarized in Excel as part of the project."><figcaption>Figure 2: Reported crimes by type per month, from October 2017 to March 2019, summarized in Excel as part of the project.</figcaption></figure>
-<p>The monthly summary shows that "other theft" is by far the most common category, usually between about 500 and 640 cases a month, while robbery and drug offences stay the lowest. Violent crime, burglary and vehicle crime sit in between, mostly around 150 to 300 a month.</p>
+<h3>Monthly trends in Excel</h3>
+<figure><img src="../../img/crime/excel_chart.png" alt="Figure 5: Reported crimes by type per month, from October 2017 to March 2019, summarized in Excel."><figcaption>Figure 5: Reported crimes by type per month, from October 2017 to March 2019, summarized in Excel.</figcaption></figure>
+<p>The monthly summary shows that "other theft" is by far the most common category, usually between about 500 and 640 cases a month, while robbery and drug offences stay the lowest.</p>
 
 <h2>What I learned</h2>
 <p>This project taught me that most of the work in a data warehouse is in the ETL, not the schema. Combining two systems that look similar but aren't, deciding what counts as bad data, and making every step safe to re-run took far more time than drawing the star schema. It's also where I first learned to keep bad data in its own table with a reason instead of deleting it, an idea I still use in my projects today.</p>
-<ul class="stack"><li>Oracle SQL</li><li>PL/SQL</li><li>Oracle APEX</li><li>Star schema</li><li>ETL</li><li>Data dictionary</li><li>Excel</li></ul>
+<ul class="stack"><li>Oracle SQL</li><li>PL/SQL</li><li>Oracle APEX</li><li>Star schema</li><li>ETL</li><li>Data dictionary</li><li>Tableau</li><li>Excel</li></ul>
 
 <a class="back" href="../../projects.html">&larr; Back to all projects</a>
 </main>
